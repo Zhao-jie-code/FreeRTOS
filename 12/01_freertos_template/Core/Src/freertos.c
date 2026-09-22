@@ -1,0 +1,231 @@
+/* USER CODE BEGIN Header */
+#include "driver_led.h"
+#include "driver_lcd.h"
+#include "driver_mpu6050.h"
+#include "driver_timer.h"
+#include "driver_ds18b20.h"
+#include "driver_dht11.h"
+#include "driver_active_buzzer.h"
+#include "driver_passive_buzzer.h"
+#include "driver_color_led.h"
+#include "driver_ir_receiver.h"
+#include "driver_ir_sender.h"
+#include "driver_light_sensor.h"
+#include "driver_ir_obstacle.h"
+#include "driver_ultrasonic_sr04.h"
+#include "driver_spiflash_w25q64.h"
+#include "driver_rotary_encoder.h"
+#include "driver_motor.h"
+#include "driver_key.h"
+#include "driver_uart.h"
+
+/**
+  ******************************************************************************
+  * File Name          : freertos.c
+  * Description        : Code for freertos applications
+  ******************************************************************************
+  * @attention
+  *
+  * Copyright (c) 2023 STMicroelectronics.
+  * All rights reserved.
+  *
+  * This software is licensed under terms that can be found in the LICENSE file
+  * in the root directory of this software component.
+  * If no LICENSE file comes with this software, it is provided AS-IS.
+  *
+  ******************************************************************************
+  */
+/* USER CODE END Header */
+
+/* Includes ------------------------------------------------------------------*/
+#include "FreeRTOS.h"
+#include "task.h"
+#include "main.h"
+#include "cmsis_os.h"
+
+/* Private includes ----------------------------------------------------------*/
+/* USER CODE BEGIN Includes */
+
+/* USER CODE END Includes */
+
+/* Private typedef -----------------------------------------------------------*/
+/* USER CODE BEGIN PTD */
+
+/* USER CODE END PTD */
+
+/* Private define ------------------------------------------------------------*/
+/* USER CODE BEGIN PD */
+
+/* USER CODE END PD */
+
+/* Private macro -------------------------------------------------------------*/
+/* USER CODE BEGIN PM */
+
+/* USER CODE END PM */
+
+/* Private variables ---------------------------------------------------------*/
+/* USER CODE BEGIN Variables */
+static StackType_t g_pucStackOfLightTask[128];
+static StaticTask_t g_TCBofLightTask;
+static TaskHandle_t xLightTaskHandle;
+
+static StackType_t g_pucStackOfColorTask[128];
+static StaticTask_t g_TCBofColorTask;
+static TaskHandle_t xColorTaskHandle;
+
+/* USER CODE END Variables */
+/* Definitions for defaultTask */
+osThreadId_t defaultTaskHandle;
+const osThreadAttr_t defaultTask_attributes = {
+  .name = "defaultTask",
+  .stack_size = 128 * 4,
+  .priority = (osPriority_t) osPriorityNormal,
+};
+
+/* Private function prototypes -----------------------------------------------*/
+/* USER CODE BEGIN FunctionPrototypes */
+
+static volatile int g_calc_end = 0;
+static uint64_t g_time = 0;
+static uint32_t g_sum=0;
+
+void CalcTask(void)
+{
+    uint32_t i=0;
+
+    g_time = system_get_ns();
+    for(i=0; i<10000000; i++)
+    {
+        g_sum += i;
+    }
+    g_calc_end = 1;
+    g_time = system_get_ns() - g_time;
+    vTaskDelete(NULL);
+}
+
+void LcdPrintTask(void)
+{
+	while (1)
+	{
+        LCD_PrintString(0, 0, "WAITING");
+        
+        vTaskDelay(5000);
+        
+        while( g_calc_end == 0);
+        LCD_Clear();
+		/* 打印信息 */
+        LCD_PrintHex(0, 0, g_sum, 1);
+        LCD_PrintSignedVal(0, 4, g_time);
+
+		vTaskDelete(NULL);
+	}
+}
+
+/* USER CODE END FunctionPrototypes */
+
+void StartDefaultTask(void *argument);
+
+void MX_FREERTOS_Init(void); /* (MISRA C 2004 rule 8.1) */
+
+/**
+  * @brief  FreeRTOS initialization
+  * @param  None
+  * @retval None
+  */
+void MX_FREERTOS_Init(void) {
+  /* USER CODE BEGIN Init */
+	
+	LCD_Init();
+	LCD_Clear();
+
+  /* USER CODE END Init */
+
+  /* USER CODE BEGIN RTOS_MUTEX */
+  /* add mutexes, ... */
+  /* USER CODE END RTOS_MUTEX */
+
+  /* USER CODE BEGIN RTOS_SEMAPHORES */
+  /* add semaphores, ... */
+  /* USER CODE END RTOS_SEMAPHORES */
+
+  /* USER CODE BEGIN RTOS_TIMERS */
+  /* start timers, add new ones, ... */
+  /* USER CODE END RTOS_TIMERS */
+
+  /* USER CODE BEGIN RTOS_QUEUES */
+  /* add queues, ... */
+  /* USER CODE END RTOS_QUEUES */
+
+  /* Create the thread(s) */
+  /* creation of defaultTask */
+  //defaultTaskHandle = osThreadNew(StartDefaultTask, NULL, &defaultTask_attributes);
+
+  /* USER CODE BEGIN RTOS_THREADS */
+  /* add threads, ... */
+  /* 创建任务: 声 */
+//  extern void PlayMusic(void *params);
+  //ret = xTaskCreate(PlayMusic, "SoundTask", 128, NULL, osPriorityNormal, &xSoundTaskHandle);
+
+  /* 创建任务: 光 */
+  //xLightTaskHandle = xTaskCreateStatic(Led_Test, "LightTask", 128, NULL, osPriorityNormal, g_pucStackOfLightTask, &g_TCBofLightTask);
+
+  /* 创建任务: 色 */
+  //xColorTaskHandle = xTaskCreateStatic(ColorLED_Test, "ColorTask", 128, NULL, osPriorityNormal, g_pucStackOfColorTask, &g_TCBofColorTask);
+  
+  /* 使用同一个函数创建不同的任务 */
+  xTaskCreate(LcdPrintTask, "task1", 128, NULL, osPriorityNormal, NULL);
+  xTaskCreate(CalcTask, "task2", 128, NULL, osPriorityNormal, NULL);
+//  xTaskCreate(LcdPrintTask, "task3", 128, &g_Task3Info, osPriorityNormal, NULL);
+
+  /* USER CODE END RTOS_THREADS */
+
+  /* USER CODE BEGIN RTOS_EVENTS */
+  /* add events, ... */
+  /* USER CODE END RTOS_EVENTS */
+
+}
+
+/* USER CODE BEGIN Header_StartDefaultTask */
+
+/**
+  * @brief  Function implementing the defaultTask thread.
+  * @param  argument: Not used
+  * @retval None
+  */
+/* USER CODE END Header_StartDefaultTask */
+void StartDefaultTask(void *argument)
+{
+  /* USER CODE BEGIN StartDefaultTask */
+  /* Infinite loop */
+  LCD_Init();
+  LCD_Clear();
+  
+  for(;;)
+  {
+    //Led_Test();
+    //LCD_Test();
+	//MPU6050_Test(); 
+	//DS18B20_Test();
+	//DHT11_Test();
+	//ActiveBuzzer_Test();
+	//PassiveBuzzer_Test();
+	//ColorLED_Test();
+//	IRReceiver_Test();  /* 影 */
+	//IRSender_Test();
+	//LightSensor_Test();
+	//IRObstacle_Test();
+	//SR04_Test();
+	//W25Q64_Test();
+	//RotaryEncoder_Test();
+	//Motor_Test();
+	//Key_Test();
+	//UART_Test();
+  }
+  /* USER CODE END StartDefaultTask */
+}
+
+/* Private application code --------------------------------------------------*/
+/* USER CODE BEGIN Application */
+
+/* USER CODE END Application */
+
